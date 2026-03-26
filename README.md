@@ -478,17 +478,6 @@
 </style>
 </head>
 <body>
-<script>
-// Clear all localStorage on every load for fresh tournament start
-(function(){
-  try{
-    Object.keys(localStorage).forEach(function(k){
-      if(k.startsWith('tradeTogether_v1')||k.startsWith('tt_'))
-        localStorage.removeItem(k);
-    });
-  }catch(e){}
-})();
-</script>
 
 <!-- COUNTDOWN GATE -->
 <div id="gate">
@@ -2215,43 +2204,40 @@ function startMarketEngine() {
 // ── Primary election ─────────────────────────────────────────────────────────
 async function claimPrimary() {
   if (_primaryClaimed) return;
+  _primaryClaimed = true; // Lock immediately to prevent double-entry
   try {
     var slot = await fbGet(MARKET_KEY + '/primary');
     var now  = Date.now();
     var stale = !slot || !slot.ts || (now - slot.ts) > 7000;
     if (stale) {
-      // Write our claim
+      // Slot is free — claim it and become primary
       await fbSet(MARKET_KEY + '/primary', { who: myUsername, ts: now });
-      // Small delay then verify we won
-      await new Promise(function(r){ setTimeout(r, 300); });
-      var verify = await fbGet(MARKET_KEY + '/primary');
-      if (verify && verify.who === myUsername) {
-        becomePrimary();
-        return;
-      }
+      becomePrimary();
+      return;
     }
+    // Someone else is primary — become reader
+    _primaryClaimed = false; // Allow re-election later
+    becomeReader();
   } catch(e) {
-    // Firebase unreachable — become primary locally
+    // Firebase unreachable — become primary locally so ticks run
     becomePrimary();
-    return;
   }
-  becomeReader();
 }
 
 function becomePrimary() {
   _isPrimary = true;
   _primaryClaimed = true;
-  console.log('[Market] Primary role claimed');
-  // Renew heartbeat every 4s
+  console.log('[Market] Primary — running price engine');
+  if (_renewInterval) clearInterval(_renewInterval);
   _renewInterval = setInterval(function() {
     fbSet(MARKET_KEY + '/primary', { who: myUsername, ts: Date.now() });
   }, 4000);
-  // Run price engine
   if (_primaryInterval) clearInterval(_primaryInterval);
   _primaryInterval = setInterval(primaryTick, TICK_MS);
-  // Also read our own writes so UI updates via same path as readers
-  if (_readerInterval) clearInterval(_readerInterval);
-  _readerInterval = setInterval(readPrices, TICK_MS + 200);
+  // Fire immediately so UI updates without waiting 2s
+  primaryTick();
+  // No reader interval needed — primaryTick updates UI directly
+  if (_readerInterval) { clearInterval(_readerInterval); _readerInterval = null; }
 }
 
 function becomeReader() {
@@ -2440,22 +2426,8 @@ async function fbGetAll(path) {
 
 
 // ── ONE-TIME DB WIPE (runs once on first load after deployment) ──────────────
-async function wipeDatabaseOnce(){
-  try{
-    if(sessionStorage.getItem('tt_db_wiped_v2'))return;
-    // Mark wiped FIRST so even if fetch fails we don't retry endlessly
-    sessionStorage.setItem('tt_db_wiped_v2','1');
-    var r = await fetch(FB_URL+'/.json',{method:'PUT',headers:{'Content-Type':'application/json'},body:'null'});
-    if(r && r.ok){
-      // Only clear localStorage keys from previous sessions (game state + old auth)
-      // Do NOT clear tt_username/tt_wallet as those may have just been written
-      Object.keys(localStorage).forEach(function(k){
-        if(k.startsWith('tradeTogether_v1')) localStorage.removeItem(k);
-      });
-      console.log('Database wiped to clean slate.');
-    }
-  }catch(e){console.warn('DB wipe failed (network restricted):',e);}
-}
+// wipeDatabaseOnce removed — wiping on page load was deleting all user data
+function wipeDatabaseOnce(){ /* disabled */ }
 // ═══ AUTH & GATE ════════════════════════════════════════════════════════════
 var SAVE_KEY = 'tradeTogether_v1';
 var saveTimer = null, myUsername = null, myWalletAddress = null;
@@ -2749,10 +2721,11 @@ function enterGame(){
   document.getElementById('app-shell').classList.remove('app-hidden');
   document.getElementById('breaking-news').classList.remove('app-hidden');
   loadState().then(function(restored){
-    renderAll(); saveState();
+    renderAll();
+    saveState(); // push to leaderboard immediately
     // Elect host — first user drives prices, others sync from Firebase
     startMarketEngine();
-    setInterval(saveState, 10000);
+    setInterval(saveState, 5000);
     setInterval(syncShared, 4000);
     setInterval(checkTournamentEvents, 5000);
     checkTournamentEvents();
@@ -2859,6 +2832,7 @@ function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(saveState,5
 // ═══ SHARED SYNC ════════════════════════════════════════════════════════════
 async function syncShared(){
   await saveState();
+  // Always render live/leaderboard if tabs are active
   var liveEl=document.getElementById('page-livetrades');
   var lbEl=document.getElementById('page-leaderboard');
   if(liveEl&&liveEl.classList.contains('active'))await renderLiveTrades();
@@ -2938,8 +2912,6 @@ function showPage(name){
 }
 
 window.addEventListener('load', function(){
-  // Wipe DB to clean slate on first load
-  wipeDatabaseOnce();
   var savedUser   = localStorage.getItem('tt_username');
   var savedWallet = localStorage.getItem('tt_wallet');
   if(savedUser){
