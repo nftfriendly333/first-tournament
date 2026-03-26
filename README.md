@@ -1,3 +1,5 @@
+[1st-tournament.html](https://github.com/user-attachments/files/26265041/1st-tournament.html)
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2454,30 +2456,30 @@ var SAVE_KEY = 'tradeTogether_v1';
 var saveTimer = null, myUsername = null, myWalletAddress = null;
 
 // ── Tournament open time ─────────────────────────────────────────────────────
-function etOff(){var n=new Date(),j=new Date(n.getFullYear(),0,1),l=new Date(n.getFullYear(),6,1);return n.getTimezoneOffset()<Math.max(j.getTimezoneOffset(),l.getTimezoneOffset())?4:5;}
+function ctOff(){var n=new Date(),j=new Date(n.getFullYear(),0,1),l=new Date(n.getFullYear(),6,1);return n.getTimezoneOffset()<Math.max(j.getTimezoneOffset(),l.getTimezoneOffset())?5:6;}
 
-// Tournament open: 
+// Tournament open: 5:36 PM CT on 3/25/2026 on 3/26/2025
 function getTournamentOpen(){
-  return new Date(Date.UTC(2026,2,26,4+etOff(),05,0));
+  return new Date(Date.UTC(2026,2,26,3+ctOff(),14,0));
 }
 function isTournamentOpen(){
-  return new Date()>=new Date(Date.UTC(2026,2,26,4+etOff(),05,0));
+  return new Date()>=new Date(Date.UTC(2026,2,26,3+ctOff(),14,0));
 }
 
-// Warning banner: 
+// Warning banner: 5:37 PM CT on 3/25/2026
 function getTournamentWarn(){
-  return new Date(Date.UTC(2026,2,26,4+etOff(),06,0));
+  return new Date(Date.UTC(2026,2,26,3+ctOff(),51,0));
 }
 function isTournamentWarnTime(){
-  return new Date()>=new Date(Date.UTC(2026,2,26,4+etOff(),06,0));
+  return new Date()>=new Date(Date.UTC(2026,2,26,3+ctOff(),51,0));
 }
 
-// Tournament close: 
+// Tournament close: 5:38 PM CT on 3/25/2026
 function getTournamentClose(){
-  return new Date(Date.UTC(2026,2,26,4+etOff(),07,0));
+  return new Date(Date.UTC(2026,2,26,3+ctOff(),52,0));
 }
 function isTournamentClosed(){
-  return new Date()>=new Date(Date.UTC(2026,2,26,4+etOff(),07,0));
+  return new Date()>=new Date(Date.UTC(2026,2,26,3+ctOff(),52,0));
 }
 
 function pad2(n){return n<10?'0'+n:''+n;}
