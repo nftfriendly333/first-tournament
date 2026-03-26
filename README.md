@@ -1,5 +1,3 @@
-[1st-tournament.html](https://github.com/user-attachments/files/26270016/1st-tournament.html)
-<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2447,7 +2445,7 @@ async function fbGetAll(path) {
 // ── ONE-TIME DB WIPE (runs once on first load after deployment) ──────────────
 // wipeDatabaseOnce removed — wiping on page load was deleting all user data
 function wipeDatabaseOnce(){ /* disabled */ }
-// ── ADMIN: Wipe all Firebase data + localStorage ──────────────────────────────
+// ── ADMIN: Wipe all Firebase data + session storage ─────────────────────────────
 async function adminWipeAll(){
   if(!confirm('ADMIN RESET\n\nThis will permanently delete:\n• All accounts & wallets\n• All leaderboard data\n• All market state\n• All local sessions\n\nContinue?')) return;
   var btn = document.getElementById('admin-wipe-btn');
@@ -2460,7 +2458,7 @@ async function adminWipeAll(){
     });
     if(r && r.ok){
       // Clear all local storage
-      try{ localStorage.clear(); }catch(e){}
+      try{ localStorage.clear(); sessionStorage.clear(); }catch(e){}
       try{ sessionStorage.clear(); }catch(e){}
       if(btn){ btn.style.color='rgba(39,174,96,.6)'; btn.textContent='✓ wiped'; }
       setTimeout(function(){ location.reload(); }, 1200);
@@ -2483,26 +2481,26 @@ function ctOff(){var n=new Date(),j=new Date(n.getFullYear(),0,1),l=new Date(n.g
 
 // Tournament open: 5:36 PM CT on 3/25/2026 on 3/26/2025
 function getTournamentOpen(){
-  return new Date(Date.UTC(2026,2,26,4+ctOff(),59,0));
+  return new Date(Date.UTC(2026,2,26,5+ctOff(),6,0));
 }
 function isTournamentOpen(){
-  return new Date()>=new Date(Date.UTC(2026,2,26,4+ctOff(),59,0));
+  return new Date()>=new Date(Date.UTC(2026,2,26,5+ctOff(),6,0));
 }
 
 // Warning banner: 5:37 PM CT on 3/25/2026
 function getTournamentWarn(){
-  return new Date(Date.UTC(2026,2,26,5+ctOff(),0,0));
+  return new Date(Date.UTC(2026,2,26,5+ctOff(),8,0));
 }
 function isTournamentWarnTime(){
-  return new Date()>=new Date(Date.UTC(2026,2,26,5+ctOff(),0,0));
+  return new Date()>=new Date(Date.UTC(2026,2,26,5+ctOff(),8,0));
 }
 
 // Tournament close: 5:38 PM CT on 3/25/2026
 function getTournamentClose(){
-  return new Date(Date.UTC(2026,2,26,5+ctOff(),1,0));
+  return new Date(Date.UTC(2026,2,26,5+ctOff(),9,0));
 }
 function isTournamentClosed(){
-  return new Date()>=new Date(Date.UTC(2026,2,26,5+ctOff(),1,0));
+  return new Date()>=new Date(Date.UTC(2026,2,26,5+ctOff(),9,0));
 }
 
 function pad2(n){return n<10?'0'+n:''+n;}
@@ -2714,17 +2712,8 @@ async function doRegister(){
     });
 
     myUsername=user; myWalletAddress=wal;
-    localStorage.setItem('tt_username', myUsername);
-    localStorage.setItem('tt_wallet',   myWalletAddress);
-    // Also persist starting wallet balance locally so it's instant on enterGame
-    var initState={
-      wallet:STARTING_GP, positions:[], tradeHistory:[], posIdCounter:0,
-      tickCount:0, chartMode:'candle', nextShiftAt:TREND_SHIFT_TICKS,
-      sessionBoundaries:[], items:[], savedAt:now,
-      username:user, walletAddress:wal,
-      totalWealth:STARTING_GP, totalPnl:0
-    };
-    localStorage.setItem(SAVE_KEY+':'+user, JSON.stringify(initState));
+    sessionStorage.setItem('tt_username', myUsername);
+    sessionStorage.setItem('tt_wallet',   myWalletAddress);
 
     closeAuthModal();
     if(isTournamentOpen()){enterGame();return;}
@@ -2751,8 +2740,8 @@ async function doLogin(){
     if(!record){err.textContent='Username not found.';btn.disabled=false;btn.textContent='Sign In \u2192';return;}
     if(await hashPw(pw)!==record.passwordHash){err.textContent='Incorrect password.';btn.disabled=false;btn.textContent='Sign In \u2192';return;}
     myUsername=record.username; myWalletAddress=record.wallet;
-    localStorage.setItem('tt_username', myUsername);
-    localStorage.setItem('tt_wallet',   myWalletAddress);
+    sessionStorage.setItem('tt_username', myUsername);
+    sessionStorage.setItem('tt_wallet',   myWalletAddress);
     closeAuthModal();
     if(isTournamentOpen()){enterGame();return;}
     document.getElementById('cd-msg').textContent='\u2713 Signed in as '+myUsername+'. Waiting for open\u2026';
@@ -2795,8 +2784,9 @@ async function saveState(){
       tickCount:tickCount,chartMode:chartMode,nextShiftAt:nextShiftAt,sessionBoundaries:sessionBoundaries,
       items:snaps,savedAt:Date.now(),username:myUsername,walletAddress:myWalletAddress,
       totalWealth:wealth,totalPnl:wealth-STARTING_GP};
-    // Personal state saved to localStorage (fast, no network)
-    localStorage.setItem(SAVE_KEY+':'+myUsername, JSON.stringify(state));
+    // Save personal state to Firebase
+    var userKey2 = safeKey(myUsername.toLowerCase());
+    await fbSet('states/'+userKey2, state);
     // Shared leaderboard + live positions via Firebase
     var userKey = safeKey(myUsername.toLowerCase());
     await fbSet('leaderboard/'+userKey, {
@@ -2821,39 +2811,20 @@ async function saveState(){
 async function loadState(){
   if(!myUsername)return false;
   try{
-    // Try localStorage first (fast)
-    var raw=localStorage.getItem(SAVE_KEY+':'+myUsername);
-    if(raw){
-      var s=JSON.parse(raw);
-      if(s&&typeof s.wallet==='number'){
-        wallet=s.wallet;positions=s.positions||[];tradeHistory=s.tradeHistory||[];
-        posIdCounter=s.posIdCounter||0;tickCount=s.tickCount||0;chartMode=s.chartMode||'candle';
-        nextShiftAt=s.nextShiftAt||TREND_SHIFT_TICKS;sessionBoundaries=s.sessionBoundaries||[];
-        if(s.walletAddress)myWalletAddress=s.walletAddress;
-        if(s.items)s.items.forEach(function(sn){
-          var it=getItem(sn.id);if(!it)return;
-          it.price=sn.price||it.price;it.trend=sn.trend||it.trend;it.volatility=sn.volatility||it.volatility;
-          if(sn.history&&sn.history.length)it.history=sn.history;
-          if(sn.candles&&sn.candles.length)it.candles=sn.candles;
-          lastPrices[it.id]=it.price;
-        });
-        return true;
-      }
-    }
-    // No local state — check Firebase for pre-saved balance (registered on another device)
     var userKey = safeKey(myUsername.toLowerCase());
+    // Try saved game state from Firebase first
+    var s = await fbGet('states/'+userKey);
+    if(s&&typeof s.wallet==='number'){
+      wallet=s.wallet;positions=s.positions||[];tradeHistory=s.tradeHistory||[];
+      posIdCounter=s.posIdCounter||0;tickCount=s.tickCount||0;chartMode=s.chartMode||'candle';
+      nextShiftAt=s.nextShiftAt||TREND_SHIFT_TICKS;sessionBoundaries=s.sessionBoundaries||[];
+      if(s.walletAddress)myWalletAddress=s.walletAddress;
+      return true;
+    }
+    // No saved state — check pre-loaded balance
     var fbBal = await fbGet('balances/'+userKey);
     if(fbBal&&fbBal.initialized){
       wallet = typeof fbBal.balance==='number' ? fbBal.balance : STARTING_GP;
-      // Save to localStorage so next load is instant
-      var initState={
-        wallet:wallet,positions:[],tradeHistory:[],posIdCounter:0,
-        tickCount:0,chartMode:'candle',nextShiftAt:TREND_SHIFT_TICKS,
-        sessionBoundaries:[],items:[],savedAt:Date.now(),
-        username:myUsername,walletAddress:myWalletAddress,
-        totalWealth:wallet,totalPnl:wallet-STARTING_GP
-      };
-      localStorage.setItem(SAVE_KEY+':'+myUsername, JSON.stringify(initState));
       return true;
     }
     return false;
@@ -2958,8 +2929,8 @@ function showPage(name){
 }
 
 window.addEventListener('load', function(){
-  var savedUser   = localStorage.getItem('tt_username');
-  var savedWallet = localStorage.getItem('tt_wallet');
+  var savedUser   = sessionStorage.getItem('tt_username');
+  var savedWallet = sessionStorage.getItem('tt_wallet');
   if(savedUser){
     myUsername      = savedUser;
     myWalletAddress = savedWallet || '';
