@@ -2283,8 +2283,11 @@ async function primaryTick() {
 
   var items = {};
   ITEMS.forEach(function(item) {
+    lastPrices[item.id] = item.price;
     var chg = item.price * ((Math.random() - 0.48) * item.volatility + item.trend);
     item.price = Math.max(5, Math.round((item.price + chg) * 100) / 100);
+    item.history.push(item.price);
+    if (item.history.length > MAX_HISTORY) item.history.shift();
     item.candleTickBuf.push(item.price);
     if (item.candles.length === 0 || item.candleTickBuf.length === 1) {
       var prev = item.candles.length ? item.candles[item.candles.length-1].c : item.price;
@@ -2303,24 +2306,28 @@ async function primaryTick() {
       price:      item.price,
       trend:      item.trend,
       volatility: item.volatility,
-      history:    item.history.concat([item.price]).slice(-MAX_HISTORY),
+      history:    item.history.slice(-MAX_HISTORY),
       candles:    item.candles.slice(-60)
     };
   });
 
-  // Write everything to Firebase atomically
-  try {
-    await fbSet(MARKET_KEY + '/state', {
-      tickCount:        tickCount,
-      nextShiftAt:      nextShiftAt,
-      sessionBoundaries: sessionBoundaries.slice(-60),
-      items:            items,
-      ts:               Date.now()
-    });
-  } catch(e) {
-    // Write failed — update local UI anyway
-    applyStateLocally({ tickCount: tickCount, items: items, nextShiftAt: nextShiftAt, ts: Date.now() });
-  }
+  // ── Update UI immediately (don't wait for Firebase round-trip) ──
+  var dot = document.getElementById('tick-dot');
+  if (dot) { dot.style.background = '#f0c040'; setTimeout(function(){ dot.style.background = 'var(--green)'; }, 300); }
+  var lbl = document.getElementById('tick-label');
+  if (lbl) lbl.textContent = 'Tick #' + tickCount;
+  checkSLTP();
+  checkPriceCeiling();
+  renderAll();
+
+  // ── Broadcast to Firebase in background (fire-and-forget) ──
+  fbSet(MARKET_KEY + '/state', {
+    tickCount:         tickCount,
+    nextShiftAt:       nextShiftAt,
+    sessionBoundaries: sessionBoundaries.slice(-60),
+    items:             items,
+    ts:                Date.now()
+  }).catch(function(e){ console.warn('Firebase write failed:', e); });
 }
 
 // ── Reader (and primary): apply Firebase state to local ITEMS ────────────────
@@ -2458,26 +2465,26 @@ function ctOff(){var n=new Date(),j=new Date(n.getFullYear(),0,1),l=new Date(n.g
 
 // Tournament open: 5:36 PM CT on 3/25/2026 on 3/26/2025
 function getTournamentOpen(){
-  return new Date(Date.UTC(2026,2,26,4+ctOff(),00,0));
+  return new Date(Date.UTC(2026,2,26,4+ctOff(),10,0));
 }
 function isTournamentOpen(){
-  return new Date()>=new Date(Date.UTC(2026,2,26,4+ctOff(),00,0));
+  return new Date()>=new Date(Date.UTC(2026,2,26,4+ctOff(),10,0));
 }
 
 // Warning banner: 5:37 PM CT on 3/25/2026
 function getTournamentWarn(){
-  return new Date(Date.UTC(2026,2,26,4+ctOff(),01,0));
+  return new Date(Date.UTC(2026,2,26,4+ctOff(),31,0));
 }
 function isTournamentWarnTime(){
-  return new Date()>=new Date(Date.UTC(2026,2,26,4+ctOff(),02,0));
+  return new Date()>=new Date(Date.UTC(2026,2,26,4+ctOff(),31,0));
 }
 
 // Tournament close: 5:38 PM CT on 3/25/2026
 function getTournamentClose(){
-  return new Date(Date.UTC(2026,2,26,4+ctOff(),03,0));
+  return new Date(Date.UTC(2026,2,26,4+ctOff(),32,0));
 }
 function isTournamentClosed(){
-  return new Date()>=new Date(Date.UTC(2026,2,26,4+ctOff(),03,0));
+  return new Date()>=new Date(Date.UTC(2026,2,26,4+ctOff(),32,0));
 }
 
 function pad2(n){return n<10?'0'+n:''+n;}
