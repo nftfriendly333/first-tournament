@@ -1,5 +1,3 @@
-[1st-tournament.html](https://github.com/user-attachments/files/26265041/1st-tournament.html)
-<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
