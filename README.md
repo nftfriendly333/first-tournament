@@ -2242,17 +2242,21 @@ function becomePrimary() {
 
 function becomeReader() {
   _isPrimary = false;
-  _primaryClaimed = true;
-  console.log('[Market] Reader mode');
+  _primaryClaimed = false;
+  console.log('[Market] Reader mode — syncing from Firebase');
   if (_primaryInterval) { clearInterval(_primaryInterval); _primaryInterval = null; }
   if (_readerInterval) clearInterval(_readerInterval);
-  _readerInterval = setInterval(readPrices, TICK_MS);
-  // Periodically check if primary has gone away
+  // Poll every 500ms so readers stay tightly in sync with primary writes
+  _readerInterval = setInterval(readPrices, 500);
+  readPrices(); // immediate first read
+  // Check if primary has gone stale every 6s
   if (_renewInterval) clearInterval(_renewInterval);
   _renewInterval = setInterval(function() {
     fbGet(MARKET_KEY + '/primary').then(function(slot) {
       if (!slot || !slot.ts || (Date.now() - slot.ts) > 7000) {
-        console.log('[Market] Primary gone — attempting takeover');
+        console.log('[Market] Primary gone — taking over');
+        if (_readerInterval) { clearInterval(_readerInterval); _readerInterval = null; }
+        if (_renewInterval) { clearInterval(_renewInterval); _renewInterval = null; }
         _primaryClaimed = false;
         claimPrimary();
       }
@@ -2317,12 +2321,15 @@ async function primaryTick() {
 }
 
 // ── Reader (and primary): apply Firebase state to local ITEMS ────────────────
+var _lastAppliedTick = -1;
+
 async function readPrices() {
   try {
     var state = await fbGet(MARKET_KEY + '/state');
     if (!state || !state.items) return;
-    // Reject stale data older than 10s
-    if (Date.now() - state.ts > 10000) return;
+    // Only apply if this is newer than what we already have
+    if (state.tickCount <= _lastAppliedTick) return;
+    _lastAppliedTick = state.tickCount;
     applyStateLocally(state);
   } catch(e) { /* keep last state */ }
 }
@@ -2392,7 +2399,17 @@ function resetFundsAndHistory() {
 }
 
 // ═══ FIREBASE CONFIG ════════════════════════════════════════════════════════
-// Free Firebase project — replace with your own if desired
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyDZQDCRj_kCiYLaMKJrlewWIsltD0XiVLA",
+  authDomain: "st-tournament-01.firebaseapp.com",
+  databaseURL: "https://st-tournament-01-default-rtdb.firebaseio.com",
+  projectId: "st-tournament-01",
+  storageBucket: "st-tournament-01.firebasestorage.app",
+  messagingSenderId: "1002635098648",
+  appId: "1:1002635098648:web:a381267b605cada58ce16d",
+  measurementId: "G-RCE5N17ZBZ"
+};
 const FB_URL = 'https://st-tournament-01-default-rtdb.firebaseio.com';
 
 async function fbGet(path) {
@@ -2428,6 +2445,33 @@ async function fbGetAll(path) {
 // ── ONE-TIME DB WIPE (runs once on first load after deployment) ──────────────
 // wipeDatabaseOnce removed — wiping on page load was deleting all user data
 function wipeDatabaseOnce(){ /* disabled */ }
+// ── ADMIN: Wipe all Firebase data + localStorage ──────────────────────────────
+async function adminWipeAll(){
+  if(!confirm('ADMIN RESET\n\nThis will permanently delete:\n• All accounts & wallets\n• All leaderboard data\n• All market state\n• All local sessions\n\nContinue?')) return;
+  var btn = document.getElementById('admin-wipe-btn');
+  if(btn) btn.textContent = '⚙ wiping…';
+  try{
+    var r = await fetch(FB_URL+'/.json',{
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body:'null'
+    });
+    if(r && r.ok){
+      // Clear all local storage
+      try{ localStorage.clear(); }catch(e){}
+      try{ sessionStorage.clear(); }catch(e){}
+      if(btn){ btn.style.color='rgba(39,174,96,.6)'; btn.textContent='✓ wiped'; }
+      setTimeout(function(){ location.reload(); }, 1200);
+    } else {
+      alert('Wipe failed: HTTP '+r.status+'\nCheck Firebase rules allow write.');
+      if(btn) btn.textContent='⚙ reset';
+    }
+  }catch(e){
+    alert('Wipe failed: '+e.message+'\nCheck Firebase rules & network.');
+    if(btn) btn.textContent='⚙ reset';
+  }
+}
+
 // ═══ AUTH & GATE ════════════════════════════════════════════════════════════
 var SAVE_KEY = 'tradeTogether_v1';
 var saveTimer = null, myUsername = null, myWalletAddress = null;
@@ -2437,26 +2481,26 @@ function ctOff(){var n=new Date(),j=new Date(n.getFullYear(),0,1),l=new Date(n.g
 
 // Tournament open: 5:36 PM CT on 3/25/2026 on 3/26/2025
 function getTournamentOpen(){
-  return new Date(Date.UTC(2026,2,26,4+ctOff(),10,0));
+  return new Date(Date.UTC(2026,2,26,4+ctOff(),45,0));
 }
 function isTournamentOpen(){
-  return new Date()>=new Date(Date.UTC(2026,2,26,4+ctOff(),10,0));
+  return new Date()>=new Date(Date.UTC(2026,2,26,4+ctOff(),45,0));
 }
 
 // Warning banner: 5:37 PM CT on 3/25/2026
 function getTournamentWarn(){
-  return new Date(Date.UTC(2026,2,26,4+ctOff(),31,0));
+  return new Date(Date.UTC(2026,2,26,4+ctOff(),47,0));
 }
 function isTournamentWarnTime(){
-  return new Date()>=new Date(Date.UTC(2026,2,26,4+ctOff(),31,0));
+  return new Date()>=new Date(Date.UTC(2026,2,26,4+ctOff(),47,0));
 }
 
 // Tournament close: 5:38 PM CT on 3/25/2026
 function getTournamentClose(){
-  return new Date(Date.UTC(2026,2,26,4+ctOff(),32,0));
+  return new Date(Date.UTC(2026,2,26,4+ctOff(),48,0));
 }
 function isTournamentClosed(){
-  return new Date()>=new Date(Date.UTC(2026,2,26,4+ctOff(),32,0));
+  return new Date()>=new Date(Date.UTC(2026,2,26,4+ctOff(),48,0));
 }
 
 function pad2(n){return n<10?'0'+n:''+n;}
