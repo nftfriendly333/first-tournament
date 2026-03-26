@@ -2458,26 +2458,26 @@ function ctOff(){var n=new Date(),j=new Date(n.getFullYear(),0,1),l=new Date(n.g
 
 // Tournament open: 5:36 PM CT on 3/25/2026 on 3/26/2025
 function getTournamentOpen(){
-  return new Date(Date.UTC(2026,2,26,3+ctOff(),45,0));
+  return new Date(Date.UTC(2026,2,26,4+ctOff(),00,0));
 }
 function isTournamentOpen(){
-  return new Date()>=new Date(Date.UTC(2026,2,26,3+ctOff(),45,0));
+  return new Date()>=new Date(Date.UTC(2026,2,26,4+ctOff(),00,0));
 }
 
 // Warning banner: 5:37 PM CT on 3/25/2026
 function getTournamentWarn(){
-  return new Date(Date.UTC(2026,2,26,3+ctOff(),47,0));
+  return new Date(Date.UTC(2026,2,26,4+ctOff(),01,0));
 }
 function isTournamentWarnTime(){
-  return new Date()>=new Date(Date.UTC(2026,2,26,3+ctOff(),47,0));
+  return new Date()>=new Date(Date.UTC(2026,2,26,4+ctOff(),02,0));
 }
 
 // Tournament close: 5:38 PM CT on 3/25/2026
 function getTournamentClose(){
-  return new Date(Date.UTC(2026,2,26,4+ctOff(),49,0));
+  return new Date(Date.UTC(2026,2,26,4+ctOff(),03,0));
 }
 function isTournamentClosed(){
-  return new Date()>=new Date(Date.UTC(2026,2,26,4+ctOff(),49,0));
+  return new Date()>=new Date(Date.UTC(2026,2,26,4+ctOff(),03,0));
 }
 
 function pad2(n){return n<10?'0'+n:''+n;}
