@@ -2456,28 +2456,28 @@ var saveTimer = null, myUsername = null, myWalletAddress = null;
 // ── Tournament open time ─────────────────────────────────────────────────────
 function etOff(){var n=new Date(),j=new Date(n.getFullYear(),0,1),l=new Date(n.getFullYear(),6,1);return n.getTimezoneOffset()<Math.max(j.getTimezoneOffset(),l.getTimezoneOffset())?4:5;}
 
-// Tournament open: 5:36 PM CT on 3/25/2026 on 3/26/2025
+// Tournament open: 
 function getTournamentOpen(){
-  return new Date(Date.UTC(2026,2,26,4+etOff(),0,0));
+  return new Date(Date.UTC(2026,2,26,4+etOff(),05,0));
 }
 function isTournamentOpen(){
-  return new Date()>=new Date(Date.UTC(2026,2,26,4+etOff(),0,0));
+  return new Date()>=new Date(Date.UTC(2026,2,26,4+etOff(),05,0));
 }
 
-// Warning banner: 5:37 PM CT on 3/25/2026
+// Warning banner: 
 function getTournamentWarn(){
-  return new Date(Date.UTC(2026,2,26,4+etOff(),01,0));
+  return new Date(Date.UTC(2026,2,26,4+etOff(),06,0));
 }
 function isTournamentWarnTime(){
-  return new Date()>=new Date(Date.UTC(2026,2,26,4+etOff(),01,0));
+  return new Date()>=new Date(Date.UTC(2026,2,26,4+etOff(),06,0));
 }
 
-// Tournament close: 5:38 PM CT on 3/25/2026
+// Tournament close: 
 function getTournamentClose(){
-  return new Date(Date.UTC(2026,2,26,4+etOff(),2,0));
+  return new Date(Date.UTC(2026,2,26,4+etOff(),07,0));
 }
 function isTournamentClosed(){
-  return new Date()>=new Date(Date.UTC(2026,2,26,4+etOff(),2,0));
+  return new Date()>=new Date(Date.UTC(2026,2,26,4+etOff(),07,0));
 }
 
 function pad2(n){return n<10?'0'+n:''+n;}
